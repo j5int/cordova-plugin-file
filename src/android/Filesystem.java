@@ -219,9 +219,13 @@ public abstract class Filesystem {
 	}
 
     protected LocalFilesystemURL makeDestinationURL(String newName, LocalFilesystemURL srcURL, LocalFilesystemURL destURL, boolean isDirectory) {
+        return makeDestinationURL(newName, srcURL.uri, destURL, isDirectory);
+    }
+
+    protected LocalFilesystemURL makeDestinationURL(String newName, Uri srcUri, LocalFilesystemURL destURL, boolean isDirectory) {
         // I know this looks weird but it is to work around a JSON bug.
         if ("null".equals(newName) || "".equals(newName)) {
-            newName = srcURL.uri.getLastPathSegment();;
+            newName = srcUri.getLastPathSegment();;
         }
 
         String newDest = destURL.uri.toString();
@@ -265,6 +269,23 @@ public abstract class Filesystem {
         if (move) {
             srcFs.removeFileAtLocalURL(srcURL);
         }
+        return getEntryForLocalURL(destination);
+    }
+
+    public JSONObject copyFileToURL(LocalFilesystemURL destURL, String newName,
+                                     Uri srcUri) throws IOException, InvalidModificationException, JSONException, NoModificationAllowedException, FileExistsException {
+        final LocalFilesystemURL destination = makeDestinationURL(newName, srcUri, destURL, false);
+        CordovaResourceApi.OpenForReadResult ofrr = resourceApi.openForRead(srcUri);
+        OutputStream os = null;
+        try {
+            os = getOutputStreamForURL(destination);
+        } catch (IOException e) {
+            ofrr.inputStream.close();
+            throw e;
+        }
+        // Closes streams.
+        resourceApi.copyResource(ofrr, os);
+
         return getEntryForLocalURL(destination);
     }
 
