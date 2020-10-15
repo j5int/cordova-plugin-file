@@ -176,7 +176,7 @@ Entry.prototype.copyTo = function (parent, newName, successCallback, errorCallba
 };
 
 Entry.copyUriTo = function (srcUri, parent, newName, successCallback, errorCallback) {
-    argscheck.checkArgs('oSFF', 'Entry.copyUriTo', arguments);
+    argscheck.checkArgs('SoSFF', 'Entry.copyUriTo', arguments);
     var fail = errorCallback && function (code) {
         errorCallback(new FileError(code));
     };
