@@ -478,19 +478,28 @@ public class LocalFilesystem extends Filesystem {
     private static void copyResource(CordovaResourceApi.OpenForReadResult input, OutputStream outputStream) throws IOException {
         try {
             InputStream inputStream = input.inputStream;
+            boolean useCopyFallback = false;
             if (inputStream instanceof FileInputStream && outputStream instanceof FileOutputStream) {
-                FileChannel inChannel = ((FileInputStream)input.inputStream).getChannel();
-                FileChannel outChannel = ((FileOutputStream)outputStream).getChannel();
-                long offset = 0;
-                long length = input.length;
-                if (input.assetFd != null) {
-                    offset = input.assetFd.getStartOffset();
+                try {
+                    FileChannel inChannel = ((FileInputStream)input.inputStream).getChannel();
+                    FileChannel outChannel = ((FileOutputStream)outputStream).getChannel();
+                    long offset = 0;
+                    long length = input.length;
+                    if (input.assetFd != null) {
+                        offset = input.assetFd.getStartOffset();
+                    }
+                    // transferFrom()'s 2nd arg is a relative position. Need to set the absolute
+                    // position first.
+                    inChannel.position(offset);
+                    outChannel.transferFrom(inChannel, 0, length);
+                } catch (IOException e) {
+                    // We're getting sometimes an unknown "no such device" error so lets just try the read/write way
+                    useCopyFallback = true;
                 }
-                // transferFrom()'s 2nd arg is a relative position. Need to set the absolute
-                // position first.
-                inChannel.position(offset);
-                outChannel.transferFrom(inChannel, 0, length);
             } else {
+                useCopyFallback = true;
+            }
+            if (useCopyFallback) {
                 final int BUFFER_SIZE = 8192;
                 byte[] buffer = new byte[BUFFER_SIZE];
 
