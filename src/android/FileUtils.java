@@ -23,9 +23,11 @@ import android.app.Activity;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
+import android.provider.MediaStore;
 import android.util.Base64;
 import android.util.Log;
 import android.webkit.MimeTypeMap;
@@ -543,6 +545,17 @@ public class FileUtils extends CordovaPlugin {
                 }
             }, rawArgs, callbackContext);
         }
+        else if (action.equals("copyUriTo")) {
+            threadhelper( new FileOp( ){
+                public void run(JSONArray args) throws JSONException, NoModificationAllowedException, IOException, InvalidModificationException, EncodingException, FileExistsException {
+                    Uri srcUri = Uri.parse(args.getString(0));
+                    String newParent=args.getString(1);
+                    String newName=args.getString(2);
+                    JSONObject entry = copyUriTo(srcUri, newParent, newName);
+                        callbackContext.success(entry);
+                }
+            }, rawArgs, callbackContext);
+        }
         else if (action.equals("readEntries")) {
             threadhelper( new FileOp( ){
                 public void run(JSONArray args) throws FileNotFoundException, JSONException, MalformedURLException, IOException {
@@ -821,6 +834,41 @@ public class FileUtils extends CordovaPlugin {
         }
 
         return destFs.copyFileToURL(destURL, newName, srcFs, srcURL, move);
+    }
+
+    private JSONObject copyUriTo(Uri srcUri, String destURLstr, String newName) throws JSONException, NoModificationAllowedException, IOException, InvalidModificationException, EncodingException, FileExistsException {
+        if (srcUri == null || destURLstr == null) {
+            // either no source or no destination provided
+            throw new FileNotFoundException();
+        }
+
+        if (newName == null || newName.equals("null")) {
+            Cursor cursor = null;
+            try {
+                String[] projection =  new String[] {MediaStore.MediaColumns.DISPLAY_NAME};
+                cursor = this.cordova.getContext().getContentResolver().query(
+                        srcUri, projection, null, null, null
+                );
+                boolean success = cursor.moveToFirst();
+                if (!success) {
+                    throw new FileNotFoundException("Source file not found");
+                }
+                newName = cursor.getString(cursor.getColumnIndex(MediaStore.MediaColumns.DISPLAY_NAME));
+            } finally {
+                if (cursor != null)
+                    cursor.close();
+            }
+
+        }
+
+        LocalFilesystemURL destURL = LocalFilesystemURL.parse(destURLstr);
+        Filesystem destFs = this.filesystemForURL(destURL);
+
+        // Check for invalid file name
+        if (newName != null && newName.contains(":")) {
+            throw new EncodingException("Bad file name");
+        }
+        return destFs.copyFileToURL(destURL, newName, srcUri);
     }
 
     /**
