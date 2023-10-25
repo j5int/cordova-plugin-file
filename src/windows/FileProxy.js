@@ -652,13 +652,7 @@ module.exports = {
 
         getFileFromPathAsync(wpath).then(
             function (storageFile) {
-                const blob = MSApp.createFileFromStorageFile(storageFile);
-                const url = URL.createObjectURL(blob, { oneTimeOnly: true }); // eslint-disable-line no-undef
-                const xhr = new XMLHttpRequest(); // eslint-disable-line no-undef
-                xhr.open('GET', url, true);
-                xhr.responseType = 'arraybuffer';
-                xhr.onload = function () {
-                    let resultArrayBuffer = xhr.response;
+                const resultHandler = function(resultArrayBuffer) {
                     // get start and end position of bytes in buffer to be returned
                     const startPos = args[1] || 0;
                     const endPos = args[2] || resultArrayBuffer.length;
@@ -681,6 +675,34 @@ module.exports = {
                         }
                     }
                     win(resultArrayBuffer);
+                }
+
+                const blob = MSApp.createFileFromStorageFile(storageFile);
+
+                let reader = new FileReader() // Is the implementation by the plugin
+                if (reader._realReader && reader._realReader.readAsArrayBuffer) {
+                    reader = reader._realReader; // the native FileReader implementation which works fine on Windows
+                    reader.onload = function () {
+                        var resultArrayBuffer = reader.result;
+                        resultHandler(resultArrayBuffer);
+                    }
+
+                    reader.onerror = function (error) {
+                        console.error("Failed to read file blob " + path + ": " + error.message)
+                        fail(FileError.NOT_READABLE_ERR);
+                    }
+
+                    reader.readAsArrayBuffer(blob)
+                    return
+                }
+
+                const url = URL.createObjectURL(blob, { oneTimeOnly: true }); // eslint-disable-line no-undef
+                const xhr = new XMLHttpRequest(); // eslint-disable-line no-undef
+                xhr.open('GET', url, true);
+                xhr.responseType = 'arraybuffer';
+                xhr.onload = function () {
+                    var resultArrayBuffer = xhr.response;
+                    resultHandler(resultArrayBuffer);
                 };
                 xhr.send();
             }, function () {
