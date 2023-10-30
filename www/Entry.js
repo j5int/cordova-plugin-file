@@ -175,6 +175,33 @@ Entry.prototype.copyTo = function (parent, newName, successCallback, errorCallba
     exec(success, fail, 'File', 'copyTo', [srcURL, parent.toInternalURL(), name]);
 };
 
+Entry.copyUriTo = function (srcUri, parent, newName, successCallback, errorCallback) {
+    argscheck.checkArgs('SoSFF', 'Entry.copyUriTo', arguments);
+    var fail = errorCallback && function (code) {
+        errorCallback(new FileError(code));
+    };
+    // success callback
+    var success = function (entry) {
+        if (entry) {
+            if (successCallback) {
+                // create appropriate Entry object
+                var newFSName = entry.filesystemName || (entry.filesystem && entry.filesystem.name);
+                var fs = newFSName ? new FileSystem(newFSName, { name: '', fullPath: '/' }) : new FileSystem(parent.filesystem.name, { name: '', fullPath: '/' }); // eslint-disable-line no-undef
+                var result = (entry.isDirectory) ? new (require('./DirectoryEntry'))(entry.name, entry.fullPath, fs, entry.nativeURL) : new (require('cordova-plugin-file.FileEntry'))(entry.name, entry.fullPath, fs, entry.nativeURL);
+                successCallback(result);
+            }
+        } else {
+            // no Entry object returned
+            if (fail) {
+                fail(FileError.NOT_FOUND_ERR);
+            }
+        }
+    };
+
+    // copy
+    exec(success, fail, 'File', 'copyUriTo', [srcUri, parent.toInternalURL(), newName]);
+};
+
 /**
  * Return a URL that can be passed across the bridge to identify this entry.
  */
